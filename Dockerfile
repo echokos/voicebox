@@ -1,6 +1,10 @@
 # ============================================================
-# Voicebox — Local TTS Server with Web UI (CPU)
-# 3-stage build: Frontend → Python deps → Runtime
+# Voicebox — Local TTS Server with Web UI (CUDA)
+# 3-stage build: Frontend → Python deps (CUDA torch) → Runtime
+#
+# Diverges from upstream only in Stage 2: installs CUDA-enabled
+# PyTorch wheels before requirements.txt so GPU works on NVIDIA
+# (incl. Blackwell / RTX 50-series sm_120).
 # ============================================================
 
 # === Stage 1: Build frontend ===
@@ -32,6 +36,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir --upgrade pip
+
+# Install CUDA-enabled PyTorch FIRST so requirements.txt's `torch>=2.2.0`
+# constraint sees an already-satisfied CUDA wheel and pip doesn't fall back
+# to the CPU wheel from PyPI. cu128 wheels include sm_120 (Blackwell/RTX 5090).
+RUN pip install --no-cache-dir --prefix=/install \
+    --index-url https://download.pytorch.org/whl/cu128 \
+    torch torchvision torchaudio
 
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
